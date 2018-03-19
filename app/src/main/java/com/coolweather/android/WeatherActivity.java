@@ -4,6 +4,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
 import android.preference.PreferenceManager;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -29,6 +30,8 @@ import okhttp3.Response;
 
 public class WeatherActivity extends AppCompatActivity {
 
+    public SwipeRefreshLayout swipeRefresh;
+    private String mWeatherId;
     private ScrollView weatherLayout;
     private TextView titleCity;
     private TextView titleUpdateTime;
@@ -64,19 +67,29 @@ public class WeatherActivity extends AppCompatActivity {
         comfortText = (TextView) findViewById(R.id.comfort_text);
         carWashText = (TextView) findViewById(R.id.car_wash_text);
         sportText = (TextView) findViewById(R.id.sport_text);
+        swipeRefresh = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh);
+        swipeRefresh.setColorSchemeResources(R.color.colorPrimary);
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String weatherString = prefs.getString("weather",null);
         if (weatherString != null) {
             //有缓存时直接解析天气数据
             Weather weather = Utility.handleWeatherResponse(weatherString);
+            mWeatherId = weather.basic.weatherId;
             showWeatherInfo(weather);
         } else {
             //无缓存时去服务器查询天气
-            String weatherId = getIntent().getStringExtra("weather_id");
+            //String weatherId = getIntent().getStringExtra("weather_id");
+            mWeatherId = getIntent().getStringExtra("weather_id");
            // Log.d("request-无缓存时去服务器查询天气",weatherId);
             weatherLayout.setVisibility(View.INVISIBLE);
-            requestWeather(weatherId);
+            requestWeather(mWeatherId);
         }
+        swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                requestWeather(mWeatherId);
+            }
+        });
 
         String bingPic = prefs.getString("bing_pic",null);
         if (bingPic != null) {
@@ -99,8 +112,9 @@ public class WeatherActivity extends AppCompatActivity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Log.d("request-1","onFailure");
+                        //Log.d("request-1","onFailure");
                         Toast.makeText(WeatherActivity.this,"获取天气信息失败",Toast.LENGTH_SHORT).show();
+                        swipeRefresh.setRefreshing(false);
                     }
                 });
             }
@@ -116,14 +130,17 @@ public class WeatherActivity extends AppCompatActivity {
                             SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this).edit();
                             editor.putString("weather",responseText);
                             editor.apply();
+                            mWeatherId = weather.basic.weatherId;
                             showWeatherInfo(weather);
                         } else {
                             Toast.makeText(WeatherActivity.this,"获取天气信息失败",Toast.LENGTH_SHORT).show();
                         }
+                        swipeRefresh.setRefreshing(false);
                     }
                 });
             }
         });
+        loadBingPic();
     }
 
     /**
@@ -141,18 +158,18 @@ public class WeatherActivity extends AppCompatActivity {
         forecastLayout.removeAllViews();
         for (Forecast forecast : weather.forecastList){
             View view = LayoutInflater.from(this).inflate(R.layout.forecast_item,forecastLayout,false);
-            TextView dateText = (TextView) findViewById(R.id.date_text);
-            TextView infoText = (TextView) findViewById(R.id.info_text);
-            TextView maxText = (TextView) findViewById(R.id.max_text);
-            TextView minText = (TextView) findViewById(R.id.min_text);
-            Log.d("request-定位-date",forecast.date);
-            //dateText.setText("你好");
-            //infoText.setText(forecast.more.info);
-            Log.d("request-定位-info",forecast.more.info);
-            //maxText.setText(forecast.temperature.max);
-            //minText.setText(forecast.temperature.min);
-            Log.d("request-定位-max",forecast.temperature.max);
-            Log.d("request-定位-min",forecast.temperature.min);
+            TextView dateText = (TextView) view.findViewById(R.id.date_text);
+            TextView infoText = (TextView) view.findViewById(R.id.info_text);
+            TextView maxText = (TextView) view.findViewById(R.id.max_text);
+            TextView minText = (TextView) view.findViewById(R.id.min_text);
+            //Log.d("request-定位-date",forecast.date);
+            dateText.setText(forecast.date);
+            infoText.setText(forecast.more.info);
+            //Log.d("request-定位-info",forecast.more.info);
+            maxText.setText(forecast.temperature.max);
+            minText.setText(forecast.temperature.min);
+            //Log.d("request-定位-max",forecast.temperature.max);
+            //Log.d("request-定位-min",forecast.temperature.min);
             forecastLayout.addView(view);
         }
 
@@ -195,5 +212,4 @@ public class WeatherActivity extends AppCompatActivity {
             }
         });
     }
-
 }
